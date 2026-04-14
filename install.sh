@@ -1,19 +1,23 @@
 #!/bin/bash
-# install.sh — Research Wiki Installer
+# install.sh — Research Wiki One-Click Installer
 #
-# Interactive setup that:
-# 1. Asks where to create the vault (no defaults)
-# 2. Asks where OpenClaw workspace is (no defaults)
-# 3. Creates the vault from scratch
-# 4. Installs the OpenClaw skill
-# 5. Installs Python dependencies
-# 6. Tells the user to run "setup" via chat to complete onboarding
+# One-command install:
+#   curl -fsSL https://raw.githubusercontent.com/zzbyy/openclaw-research-flows/main/install.sh | bash
 #
-# Usage: bash install.sh
+# Or from a local clone:
+#   bash install.sh
+#
+# What it does:
+# 1. Clones the repo (if running via curl, not already in the repo)
+# 2. Asks where to create the vault
+# 3. Asks where OpenClaw workspace is
+# 4. Creates vault, installs skill, installs Python deps
+# 5. Tells the user to send "setup" in chat to complete onboarding
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_URL="https://github.com/zzbyy/openclaw-research-flows.git"
+REPO_NAME="openclaw-research-flows"
 
 # --- Colors ---
 RED='\033[0;31m'
@@ -39,11 +43,6 @@ echo "  - Scans papers daily and builds a knowledge wiki"
 echo "  - Tracks researchers, citations, and topics"
 echo "  - Sends you briefings via Telegram or Feishu"
 echo ""
-echo "You'll need:"
-echo "  - Claude Code CLI installed (claude)"
-echo "  - OpenClaw running with cc-bridge"
-echo "  - Python 3.9+"
-echo ""
 
 # --- Check prerequisites ---
 MISSING=()
@@ -53,6 +52,9 @@ if ! command -v claude &>/dev/null; then
 fi
 if ! command -v python3 &>/dev/null; then
     MISSING+=("python3 — Install: brew install python3")
+fi
+if ! command -v git &>/dev/null; then
+    MISSING+=("git — Install: xcode-select --install")
 fi
 
 if [ ${#MISSING[@]} -gt 0 ]; then
@@ -64,6 +66,40 @@ if [ ${#MISSING[@]} -gt 0 ]; then
     echo "Install these first, then run this script again."
     exit 1
 fi
+
+# --- Bootstrap: ensure we have the repo files ---
+# Detect if we're running from inside the cloned repo or via curl|bash
+SCRIPT_DIR=""
+
+if [ -f "vault/CLAUDE.md" ] && [ -f "skill/SKILL.md" ]; then
+    # Running from inside the repo (user cloned it manually)
+    SCRIPT_DIR="$(pwd)"
+    info "Running from local repo at $SCRIPT_DIR"
+elif [ -n "${BASH_SOURCE[0]}" ] && [ -f "$(dirname "${BASH_SOURCE[0]}")/vault/CLAUDE.md" ] 2>/dev/null; then
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    info "Running from local repo at $SCRIPT_DIR"
+else
+    # Running via curl|bash or from outside the repo — clone it
+    echo -e "${BOLD}Downloading research-flows...${NC}"
+
+    CLONE_DIR="$HOME/$REPO_NAME"
+    if [ -d "$CLONE_DIR/.git" ]; then
+        info "Repo already exists at $CLONE_DIR, pulling latest..."
+        git -C "$CLONE_DIR" pull --quiet 2>/dev/null || true
+    else
+        git clone --quiet "$REPO_URL" "$CLONE_DIR"
+        info "Cloned to $CLONE_DIR"
+    fi
+    SCRIPT_DIR="$CLONE_DIR"
+fi
+
+# Verify repo files are present
+if [ ! -f "$SCRIPT_DIR/vault/CLAUDE.md" ] || [ ! -f "$SCRIPT_DIR/skill/SKILL.md" ]; then
+    error "Repo files not found at $SCRIPT_DIR. Something went wrong."
+    exit 1
+fi
+
+echo ""
 
 # --- Ask for vault path ---
 ask "Where should the research vault be created?"
@@ -95,7 +131,7 @@ done
 
 # --- Ask for OpenClaw workspace path ---
 ask "Where is your OpenClaw workspace?"
-echo "  This is typically ~/.openclaw/workspace or a custom path."
+echo "  This is where your OpenClaw skills live."
 echo "  The research-wiki skill will be installed here."
 echo ""
 
@@ -168,7 +204,7 @@ cp -R "$SCRIPT_DIR/vault/"* "$VAULT_DIR/" 2>/dev/null || true
 for f in "$SCRIPT_DIR/vault/".*; do
     [ -f "$f" ] && cp "$f" "$VAULT_DIR/" 2>/dev/null || true
 done
-# Ensure directory structure exists (in case cp didn't create nested dirs)
+# Ensure directory structure exists
 mkdir -p "$VAULT_DIR/wiki/summaries" "$VAULT_DIR/wiki/entities" "$VAULT_DIR/wiki/concepts"
 mkdir -p "$VAULT_DIR/wiki/synthesis/reviews" "$VAULT_DIR/wiki/synthesis/weekly"
 mkdir -p "$VAULT_DIR/wiki/contradictions" "$VAULT_DIR/wiki/monitoring/reports"
@@ -218,6 +254,7 @@ echo -e "${BOLD}╚════════════════════�
 echo ""
 echo "  Vault:  $VAULT_DIR"
 echo "  Skill:  $SKILL_DEST"
+echo "  Repo:   $SCRIPT_DIR"
 echo ""
 echo -e "${BOLD}What to do next:${NC}"
 echo ""

@@ -34,19 +34,19 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full data flow.
 
 ## Quick Start
 
-### Step 1: Install
+### Step 1: Install (one command)
 
 ```bash
-git clone https://github.com/zzbyy/openclaw-research-flows.git
-cd openclaw-research-flows
-bash install.sh
+curl -fsSL https://raw.githubusercontent.com/zzbyy/openclaw-research-flows/main/install.sh | bash
 ```
 
-The installer will ask you:
-- Where to create the vault (any path you choose)
-- Where your OpenClaw workspace is
+That's it. The script will:
+- Clone the repo to `~/openclaw-research-flows`
+- Ask where to create your vault
+- Ask where your OpenClaw workspace is
+- Create the vault, install the skill, and set up Python dependencies
 
-It creates the vault, installs the skill, and sets up Python dependencies.
+(Or if you prefer to clone manually: `git clone https://github.com/zzbyy/openclaw-research-flows.git && cd openclaw-research-flows && bash install.sh`)
 
 ### Step 2: Complete onboarding
 
