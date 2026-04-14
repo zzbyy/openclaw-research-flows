@@ -43,286 +43,262 @@ When the user sends `/rw setup`, `/research-wiki setup`, or `/rw onboard`:
 
 **Do NOT dispatch to Claude Code.** Handle this entirely yourself, in the conversation.
 
-This is an interactive 5-stage wizard. Ask questions one at a time, wait for each answer,
-then write the answers to files in the vault using `exec bash` commands.
+This is an interactive 4-stage wizard. Each stage collects info that directly shapes
+how the wiki finds and organizes research papers for the user. Explain WHY you're
+asking each question — the user is a researcher, not a developer.
 
-### Finding the vault path
+Ask questions one at a time. Wait for each answer. Acknowledge before moving on.
 
-The vault path is configured in `dispatch-research.sh`. Find it with:
+### Before starting
+
+Find the vault path:
 ```bash
 bash command:"DISPATCH=$(find ~/.openclaw -path '*/research-wiki/scripts/dispatch-research.sh' 2>/dev/null | head -1) && grep 'VAULT_DIR=' \"$DISPATCH\" | head -1 | cut -d'\"' -f2"
 ```
 Store this as VAULT_DIR for all file operations below.
 
-### Detecting first-run vs re-run
-
-Before starting, check if CLAUDE.md still has placeholders:
+Check if this is a re-run:
 ```bash
 bash command:"grep -c '\[YOUR_FIELD' $VAULT_DIR/CLAUDE.md"
 ```
+If count = 0, tell user: "Looks like you've set this up before. No problem — I'll update your settings with the new answers."
 
-- If count > 0: **first run** — placeholders exist, will be replaced.
-- If count = 0: **re-run** — tell the user: "You've already configured the research wiki. I'll update your settings with the new answers."
+### How to write to CLAUDE.md (works on first-run and re-run)
 
-### How to write values to CLAUDE.md
-
-CLAUDE.md has lines like:
-```
-**Field**: [YOUR_FIELD — e.g., Machine Learning / NLP / Data Engineering]
-```
-Or after first setup:
-```
-**Field**: Biomedical Engineering
-```
-
-To update a field (works for both first-run and re-run), replace the entire line:
+Always replace the **entire line** so it works regardless of current content:
 ```bash
 bash command:"sed -i '' 's|^\*\*Field\*\*:.*|**Field**: NEW_VALUE|' $VAULT_DIR/CLAUDE.md"
-bash command:"sed -i '' 's|^\*\*Thesis\*\*:.*|**Thesis**: NEW_VALUE|' $VAULT_DIR/CLAUDE.md"
-bash command:"sed -i '' 's|^\*\*Institution\*\*:.*|**Institution**: NEW_VALUE|' $VAULT_DIR/CLAUDE.md"
-bash command:"sed -i '' 's|^\*\*Advisor\*\*:.*|**Advisor**: NEW_VALUE|' $VAULT_DIR/CLAUDE.md"
 ```
 
-For keywords (multi-line), replace the block between markers.
-The primary keywords section starts after `**Primary keywords**` and ends at the next `**` line.
-Use python for multi-line replacement:
+For multi-line blocks (keywords), use python:
 ```bash
 bash command:"python3 -c \"
 import re
 with open('$VAULT_DIR/CLAUDE.md') as f: text = f.read()
-# Replace primary keywords block
-text = re.sub(
-    r'(\*\*Primary keywords\*\*.*?\n)((?:- .*\n)*)',
-    r'\g<1>- keyword1\n- keyword2\n- keyword3\n',
-    text
-)
-# Replace secondary keywords block
-text = re.sub(
-    r'(\*\*Secondary keywords\*\*.*?\n)((?:- .*\n)*)',
-    r'\g<1>- keyword4\n- keyword5\n',
-    text
-)
+text = re.sub(r'(\*\*Primary keywords\*\*.*?\n)((?:- .*\n)*)', r'\g<1>- kw1\n- kw2\n- kw3\n', text)
 with open('$VAULT_DIR/CLAUDE.md', 'w') as f: f.write(text)
 \""
 ```
 
-For arXiv categories:
-```bash
-bash command:"sed -i '' 's|^\*\*arXiv categories\*\*:.*|**arXiv categories**: cs.LG, cs.CL|' $VAULT_DIR/CLAUDE.md"
-```
+### How to write API keys
 
-This approach works identically on first-run and re-run because it replaces the whole
-line regardless of current content.
+**NEVER write API keys to config.md or any file in the vault** — the user may sync
+the vault to GitHub. Instead, write keys to environment variables:
+```bash
+bash command:"grep -q 'SEMANTIC_SCHOLAR_API_KEY' ~/.zshrc || echo 'export SEMANTIC_SCHOLAR_API_KEY=\"KEY\"' >> ~/.zshrc"
+```
+Tell the user: "I've added the key to your shell profile. Run `source ~/.zshrc` or open a new terminal for it to take effect."
+
+---
 
 ### Stage 1: Research Profile
 
-Ask these questions one at a time. After each answer, acknowledge it before asking the next.
+**Explain to the user:**
+> "First, I need to understand your research so the wiki knows what papers matter to you.
+> Your answers here are used to:
+> - Score how relevant new papers are (daily briefings only surface what matters)
+> - Connect new papers to existing knowledge in your wiki
+> - Focus monitoring on your specific area"
 
-1. "What is your research field? (e.g., Biomedical Engineering, Machine Learning, Economics)"
-2. "What is your primary research focus or thesis? Describe in one sentence."
-3. "What institution or organization are you with? (or 'independent')"
-4. "Who is your advisor or research lead? (or 'none')"
-5. "List 3-5 primary keywords — the terms that matter most for finding relevant papers. Separate with commas."
-6. "Any secondary/broader keywords? These cast a wider net. (or 'skip')"
-7. "What arXiv categories should we scan? (e.g., cs.LG, cs.CL, q-bio.BM — or 'skip' if you don't use arXiv)"
+**Questions (ask one at a time):**
 
-After collecting all answers, write them using the line-replacement approach above.
+1. "What is your research field? (e.g., Biomedical Engineering, Computational Biology, Machine Learning)"
 
-Show summary:
+2. "In one sentence, what is your primary research focus?"
+   (This becomes the thesis — used to judge if a paper is worth auto-ingesting)
+
+3. "List 3-5 primary keywords — the specific terms most central to your work. Separate with commas."
+   (These get the highest weight when scoring paper relevance)
+
+4. "Any broader/secondary keywords? These cast a wider net to catch adjacent work. (or 'skip')"
+
+5. "Which databases should we scan for papers?"
+   Present:
+   - **PubMed** — biomedical and life sciences
+   - **arXiv** — physics, CS, math, quantitative biology preprints. Categories help narrow results — e.g., `q-bio.BM` for biomolecular, `cs.LG` for machine learning. (ask which categories if they pick arXiv)
+   - **Semantic Scholar** — cross-discipline, good for citation tracking
+
+   User picks one or more.
+
+6. If Semantic Scholar: "Do you have a Semantic Scholar API key? It's free and gives higher rate limits. (or 'skip' — it works without one)"
+   If provided → write to `~/.zshrc` as env var (NOT to vault files).
+
+**Write all answers** to CLAUDE.md and config.md using the line-replacement approach.
+Enable/disable sources in `$VAULT_DIR/wiki/monitoring/config.md`:
+```bash
+bash command:"python3 -c \"
+import re
+with open('$VAULT_DIR/wiki/monitoring/config.md') as f: text = f.read()
+text = re.sub(r'(pubmed:\n\s*enabled:) \w+', r'\g<1> true', text)  # or false
+text = re.sub(r'(arxiv:\n\s*enabled:) \w+', r'\g<1> true', text)
+text = re.sub(r'(semantic_scholar:\n\s*enabled:) \w+', r'\g<1> true', text)
+with open('$VAULT_DIR/wiki/monitoring/config.md', 'w') as f: f.write(text)
+\""
 ```
-✅ Research Profile Configured
+
+**Show summary:**
+```
+✅ Stage 1 Complete — Research Profile
 
 Field: [field]
-Thesis: [thesis]
-Primary keywords: [k1], [k2], [k3]
-Secondary keywords: [k4], [k5]
-arXiv categories: [categories]
+Focus: [thesis]
+Keywords: [k1], [k2], [k3] + [secondary]
+Sources: [PubMed, arXiv (q-bio.BM), Semantic Scholar]
 
-Moving to Stage 2...
+This tells the wiki what to look for. Next: who and what to watch.
 ```
 
-### Stage 2: Sources & APIs
+---
 
-Ask: "Which paper sources should we enable?"
-Present options:
-- **PubMed** — biomedical and life sciences (free)
-- **arXiv** — physics, CS, math, biology preprints (free)
-- **Semantic Scholar** — cross-discipline citation tracking (free)
+### Stage 2: Monitoring Watchlist
 
-User can pick one or more.
+**Explain to the user:**
+> "Now let's set up monitoring. This is how the wiki stays current automatically:
+>
+> - **Track researchers** — when someone you follow publishes a new paper, the wiki notices and can add it automatically
+> - **Track papers** — when a key paper in your field gets cited by someone new, you'll know about it
+> - **Track topics** — when a burst of papers appears on a topic you care about, the wiki flags it
+>
+> All of this feeds into your daily briefing and weekly monitoring reports."
 
-If PubMed: ask for email (required by NCBI API policy).
-If Semantic Scholar: ask if they have an API key (optional, higher rate limits).
+**Questions:**
 
-Write to `$VAULT_DIR/wiki/monitoring/config.md` using python to update the YAML block
-(works on both first-run and re-run):
-```bash
-bash command:"python3 -c \"
-import re
-with open('$VAULT_DIR/wiki/monitoring/config.md') as f: text = f.read()
-text = re.sub(r'pubmed:\n\s*enabled: \w+', 'pubmed:\n    enabled: true', text)
-text = re.sub(r'arxiv:\n\s*enabled: \w+', 'arxiv:\n    enabled: true', text)
-text = re.sub(r'semantic_scholar:\n\s*enabled: \w+', 'semantic_scholar:\n    enabled: true', text)
-# Update PubMed email if provided
-text = re.sub(r'email: \".*?\"', 'email: \"USER_EMAIL\"', text)
-with open('$VAULT_DIR/wiki/monitoring/config.md', 'w') as f: f.write(text)
-\""
+1. "Name 1-5 researchers whose new publications you want to track. For each, tell me their name. (or 'skip' to set up later with `/rw track researcher [name]`)"
+
+   For each researcher, verify they exist on Semantic Scholar:
+   ```bash
+   bash command:"cd $VAULT_DIR && python3 scripts/search_semantic_scholar.py --author 'NAME' --max-results 1"
+   ```
+   Show the result to confirm it's the right person.
+
+   Ask: "How should we handle new papers from [name]?
+   - **daily** — include in your morning briefing
+   - **weekly** — include in the weekly monitoring report"
+
+2. "Any key papers whose new citations you want to track? Give me titles or IDs — arXiv ID, DOI, or PMID. (or 'skip')"
+
+   For each paper, look up current citation count. Ask daily or weekly.
+
+3. "Any emerging topics to watch? Give a topic name and 2-3 keywords. (or 'skip')"
+
+On **re-run**, show existing watchlist first and ask "Replace or add to it?"
+
+Write to `$VAULT_DIR/wiki/monitoring/config.md` tracked researchers/papers/topics tables
+using python to replace the table body.
+
+**Show summary:**
 ```
-
-Show summary:
-```
-✅ Sources Configured
-
-Enabled: [list]
-PubMed email: [email if applicable]
-```
-
-### Stage 3: Monitoring Watchlist
-
-Ask: "Name 1-5 researchers you want to track. For each, give their name and why they matter. (or 'skip')"
-
-For each researcher, verify they exist:
-```bash
-bash command:"cd $VAULT_DIR && python3 scripts/search_semantic_scholar.py --author 'RESEARCHER_NAME' --max-results 1"
-```
-
-Ask alert level: high (instant alert) / medium (daily briefing) / low (weekly)
-
-On **re-run**, first check existing tracked researchers:
-```bash
-bash command:"grep '^\|' $VAULT_DIR/wiki/monitoring/config.md | grep -v '\[Researcher' | grep -v '^\| Name' | grep -v '^\|---'"
-```
-Show the user what's currently tracked and ask: "Want to replace the list or add to it?"
-
-To write researchers, use python to replace the entire table body (works for both
-first-run and re-run — replaces placeholder rows or existing rows):
-```bash
-bash command:"python3 -c \"
-import re
-with open('$VAULT_DIR/wiki/monitoring/config.md') as f: text = f.read()
-# Replace tracked researchers table rows (between header and next section)
-# Keep the header row, replace everything until the next ### or ---
-new_rows = '| Name1 | Institution1 | high | reason1 |\n| Name2 | Institution2 | medium | reason2 |'
-text = re.sub(
-    r'(\| Name \| Institution \| Alert Level \| Notes \|\n\|---.*?\|\n).*?(\n\n)',
-    r'\g<1>' + new_rows + r'\n\g<2>',
-    text, flags=re.DOTALL
-)
-with open('$VAULT_DIR/wiki/monitoring/config.md', 'w') as f: f.write(text)
-\""
-```
-
-Same approach for tracked papers and topics tables.
-
-Then ask: "Any key papers to monitor for citations? Give titles or IDs. (or 'skip')"
-Then ask: "Any topics to watch? Give topic name + 2-3 keywords each. (or 'skip')"
-
-Show summary:
-```
-✅ Monitoring Watchlist Configured
+✅ Stage 2 Complete — Monitoring Watchlist
 
 Researchers: [N] tracked
 Papers: [N] citation seeds
 Topics: [N] watched
+
+These will be checked automatically on your schedule. Next: let's set that up.
 ```
 
-### Stage 4: Notification Preferences
+---
 
-Ask: "What timezone are you in? (e.g., Asia/Shanghai, America/New_York, Europe/London)"
-Ask: "Want quiet hours — only urgent alerts? (e.g., 22:00-07:00, or 'no')"
+### Stage 3: Schedule
 
-Write to `$VAULT_DIR/wiki/monitoring/config.md` notification block.
-
-Show summary:
-```
-✅ Notifications Configured
-
-Timezone: [tz]
-Quiet hours: [window or 'none']
-```
-
-### Stage 5: Schedule Setup
+**Explain to the user:**
+> "Now let's decide when the wiki does its work automatically. Each job runs in the
+> background and sends you results right here in this chat."
 
 First, check for existing rw- cron jobs (re-run case):
 ```bash
 bash command:"openclaw cron list 2>/dev/null | grep 'rw-' || echo 'none'"
 ```
+If found, tell user: "You have existing scheduled jobs. I'll replace them with your new choices."
+Delete old rw- jobs before creating new ones.
 
-If existing jobs found, tell the user: "You have existing scheduled jobs. I'll remove them and set up fresh ones."
-Delete old rw- jobs:
-```bash
-bash command:"openclaw cron list --json 2>/dev/null | python3 -c \"
-import json, sys, subprocess
-jobs = json.load(sys.stdin)
-for j in jobs:
-    if j.get('name','').startswith('rw-'):
-        subprocess.run(['openclaw','cron','delete', j['id']], capture_output=True)
-        print(f'Removed: {j[\"name\"]}')
-\" 2>/dev/null || true"
+**Present the jobs:**
 ```
-
-Then present available automated jobs:
-```
-I can set up these automated research jobs for you:
+Here's what I can automate for you:
 
 📬 Morning Briefing (recommended)
-   Scans papers daily, auto-ingests the best ones.
+   Every morning, scans your configured databases for new papers,
+   scores them against your keywords, and auto-adds the best ones
+   to your wiki. You get a summary here in chat.
    Suggested: every day at 7:00 AM
 
-📦 Nightly Batch Processing
-   Processes PDFs from your library in the background.
-   Suggested: every day at 9:00 PM (silent)
+📦 Background Processing
+   Quietly works through PDFs you've dropped into the vault's inbox.
+   No notification unless something goes wrong.
+   Suggested: every day at 9:00 PM
 
-📡 Weekly Full Monitoring
-   Deep scan of all tracked researchers, citations, topics.
+📡 Weekly Monitoring
+   Deep check of all your tracked researchers, citation networks,
+   and topics. Generates a monitoring report in the wiki.
    Suggested: every Saturday at 6:00 AM
 
 🔧 Weekly Maintenance
-   Fixes broken links, decays old claims, cleans up wiki.
+   Cleans up the wiki — fixes broken links, flags stale claims,
+   updates confidence scores.
    Suggested: every Sunday at 6:00 PM
 
-Which ones would you like? (recommended: start with Morning Briefing + Nightly Batch)
+Which ones would you like? (I'd recommend starting with Morning Briefing + Background Processing)
 ```
 
-For each selected job, ask what time (or accept suggested).
+For each selected job, ask: "What time? (or keep the suggested time)"
 
-Register each cron job using the timezone from Stage 4.
-All job names use the `rw-` prefix so they can be identified on re-run:
+OpenClaw already knows the user's timezone — no need to ask. Register jobs:
 ```bash
-bash command:"openclaw cron add --name 'rw-morning-briefing' --cron '3 7 * * *' --tz 'USER_TZ' --message '/rw briefing' --timeout-seconds 600"
-bash command:"openclaw cron add --name 'rw-nightly-batch' --cron '7 21 * * *' --tz 'USER_TZ' --message '/rw batch 5' --timeout-seconds 600"
-bash command:"openclaw cron add --name 'rw-weekly-monitor' --cron '3 6 * * 6' --tz 'USER_TZ' --message '/rw monitor' --timeout-seconds 900"
-bash command:"openclaw cron add --name 'rw-weekly-maintenance' --cron '3 18 * * 0' --tz 'USER_TZ' --message '/rw lint deep' --timeout-seconds 600"
+bash command:"openclaw cron add --name 'rw-morning-briefing' --cron '3 7 * * *' --message '/rw briefing' --timeout-seconds 600"
+bash command:"openclaw cron add --name 'rw-nightly-batch' --cron '7 21 * * *' --message '/rw batch 5' --timeout-seconds 600"
+bash command:"openclaw cron add --name 'rw-weekly-monitor' --cron '3 6 * * 6' --message '/rw monitor' --timeout-seconds 900"
+bash command:"openclaw cron add --name 'rw-weekly-maintenance' --cron '3 18 * * 0' --message '/rw lint deep' --timeout-seconds 600"
 ```
 
-### Completion
-
-After all 5 stages:
+**Show summary:**
 ```
-🎉 Research Wiki Setup Complete!
+✅ Stage 3 Complete — Schedule
 
-📋 What's configured:
-- Research profile: [field] / [thesis]
-- Sources: [list]
-- Monitoring: [N] researchers, [N] papers, [N] topics
-- Timezone: [tz]
-- Schedule: [N] automated jobs
+[N] automated jobs set up:
+- Morning Briefing: daily at [time]
+- Background Processing: daily at [time]
+...
 
-📖 Quick reference:
-- /rw briefing       — daily research update
-- /rw ingest [path]  — process a paper
-- /rw query [topic]  — ask your wiki a question
-- /rw monitor        — run a monitoring cycle
-- /rw stats          — wiki health
-- /rw triage         — review pending papers
+Results will be sent to you here in this chat.
+```
 
-Your first briefing will run at [next scheduled time].
-Drop PDFs into raw/inbox/ anytime — they'll be processed automatically.
+---
+
+### Stage 4: Done
+
+```
+🎉 Your Research Wiki is ready!
+
+Here's what's set up:
+
+📖 Wiki vault: [VAULT_DIR]
+   This is where your knowledge base lives. You can open it in Obsidian too.
+
+🔬 Research focus: [field] — [thesis]
+   Papers are scored against your keywords: [k1], [k2], [k3]
+
+📡 Monitoring: [N] researchers, [N] papers, [N] topics
+   New publications and citations will be caught automatically.
+
+⏰ Schedule: [N] automated jobs
+   [list jobs and times]
+
+📖 Commands you can use anytime:
+   /rw briefing       — run a briefing now
+   /rw ingest [path]  — add a paper to the wiki
+   /rw query [topic]  — ask your wiki a question
+   /rw monitor        — run monitoring now
+   /rw stats          — check wiki health
+   /rw triage         — review papers waiting for you
+   /rw schedule       — change your automated schedule
+
+Drop PDFs into [VAULT_DIR]/raw/inbox/ anytime — they'll be processed by
+your background job, or send /rw process inbox to do it now.
 ```
 
 Write a log entry:
 ```bash
-bash command:"echo '## [DATE] onboard | Initial setup complete\n- Field: [field]\n- Sources: [list]\n- Researchers: [N]\n- Schedule: [N] jobs' >> $VAULT_DIR/wiki/_log.md"
+bash command:"echo '## [DATE] setup | Configuration complete\n- Field: [field]\n- Sources: [list]\n- Monitoring: [N] researchers, [N] papers, [N] topics\n- Schedule: [N] jobs' >> $VAULT_DIR/wiki/_log.md"
 ```
 
 ---
