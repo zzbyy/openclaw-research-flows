@@ -46,11 +46,73 @@ When the user sends `/rw setup`, `/research-wiki setup`, or `/rw onboard`:
 This is an interactive 5-stage wizard. Ask questions one at a time, wait for each answer,
 then write the answers to files in the vault using `exec bash` commands.
 
-The vault path is configured in `dispatch-research.sh`. Read it with:
+### Finding the vault path
+
+The vault path is configured in `dispatch-research.sh`. Find it with:
 ```bash
-bash command:"grep 'VAULT_DIR=' ~/.openclaw/workspace/skills/research-wiki/scripts/dispatch-research.sh | head -1 | cut -d'\"' -f2"
+bash command:"DISPATCH=$(find ~/.openclaw -path '*/research-wiki/scripts/dispatch-research.sh' 2>/dev/null | head -1) && grep 'VAULT_DIR=' \"$DISPATCH\" | head -1 | cut -d'\"' -f2"
 ```
 Store this as VAULT_DIR for all file operations below.
+
+### Detecting first-run vs re-run
+
+Before starting, check if CLAUDE.md still has placeholders:
+```bash
+bash command:"grep -c '\[YOUR_FIELD' $VAULT_DIR/CLAUDE.md"
+```
+
+- If count > 0: **first run** — placeholders exist, will be replaced.
+- If count = 0: **re-run** — tell the user: "You've already configured the research wiki. I'll update your settings with the new answers."
+
+### How to write values to CLAUDE.md
+
+CLAUDE.md has lines like:
+```
+**Field**: [YOUR_FIELD — e.g., Machine Learning / NLP / Data Engineering]
+```
+Or after first setup:
+```
+**Field**: Biomedical Engineering
+```
+
+To update a field (works for both first-run and re-run), replace the entire line:
+```bash
+bash command:"sed -i '' 's|^\*\*Field\*\*:.*|**Field**: NEW_VALUE|' $VAULT_DIR/CLAUDE.md"
+bash command:"sed -i '' 's|^\*\*Thesis\*\*:.*|**Thesis**: NEW_VALUE|' $VAULT_DIR/CLAUDE.md"
+bash command:"sed -i '' 's|^\*\*Institution\*\*:.*|**Institution**: NEW_VALUE|' $VAULT_DIR/CLAUDE.md"
+bash command:"sed -i '' 's|^\*\*Advisor\*\*:.*|**Advisor**: NEW_VALUE|' $VAULT_DIR/CLAUDE.md"
+```
+
+For keywords (multi-line), replace the block between markers.
+The primary keywords section starts after `**Primary keywords**` and ends at the next `**` line.
+Use python for multi-line replacement:
+```bash
+bash command:"python3 -c \"
+import re
+with open('$VAULT_DIR/CLAUDE.md') as f: text = f.read()
+# Replace primary keywords block
+text = re.sub(
+    r'(\*\*Primary keywords\*\*.*?\n)((?:- .*\n)*)',
+    r'\g<1>- keyword1\n- keyword2\n- keyword3\n',
+    text
+)
+# Replace secondary keywords block
+text = re.sub(
+    r'(\*\*Secondary keywords\*\*.*?\n)((?:- .*\n)*)',
+    r'\g<1>- keyword4\n- keyword5\n',
+    text
+)
+with open('$VAULT_DIR/CLAUDE.md', 'w') as f: f.write(text)
+\""
+```
+
+For arXiv categories:
+```bash
+bash command:"sed -i '' 's|^\*\*arXiv categories\*\*:.*|**arXiv categories**: cs.LG, cs.CL|' $VAULT_DIR/CLAUDE.md"
+```
+
+This approach works identically on first-run and re-run because it replaces the whole
+line regardless of current content.
 
 ### Stage 1: Research Profile
 
@@ -64,22 +126,7 @@ Ask these questions one at a time. After each answer, acknowledge it before aski
 6. "Any secondary/broader keywords? These cast a wider net. (or 'skip')"
 7. "What arXiv categories should we scan? (e.g., cs.LG, cs.CL, q-bio.BM — or 'skip' if you don't use arXiv)"
 
-After collecting all answers, write them to CLAUDE.md using sed:
-```bash
-bash command:"sed -i '' 's|\[YOUR_FIELD.*\]|ACTUAL_FIELD|' $VAULT_DIR/CLAUDE.md"
-bash command:"sed -i '' 's|\[YOUR_THESIS.*\]|ACTUAL_THESIS|' $VAULT_DIR/CLAUDE.md"
-bash command:"sed -i '' 's|\[YOUR_INSTITUTION\]|ACTUAL_INSTITUTION|' $VAULT_DIR/CLAUDE.md"
-bash command:"sed -i '' 's|\[ADVISOR_NAME\]|ACTUAL_ADVISOR|' $VAULT_DIR/CLAUDE.md"
-```
-
-For keywords, replace the placeholder lines:
-```bash
-bash command:"sed -i '' '/^\- \[keyword1\]/,/^\- \[keyword5\]/{
-s/- \[keyword1\]/- actual_keyword1/
-s/- \[keyword2\]/- actual_keyword2/
-s/- \[keyword3\]/- actual_keyword3/
-}' $VAULT_DIR/CLAUDE.md"
-```
+After collecting all answers, write them using the line-replacement approach above.
 
 Show summary:
 ```
@@ -107,9 +154,19 @@ User can pick one or more.
 If PubMed: ask for email (required by NCBI API policy).
 If Semantic Scholar: ask if they have an API key (optional, higher rate limits).
 
-Write to `$VAULT_DIR/wiki/monitoring/config.md` — update the `apis:` YAML block:
+Write to `$VAULT_DIR/wiki/monitoring/config.md` using python to update the YAML block
+(works on both first-run and re-run):
 ```bash
-bash command:"sed -i '' 's/pubmed:/pubmed:\n    enabled: true/' $VAULT_DIR/wiki/monitoring/config.md"
+bash command:"python3 -c \"
+import re
+with open('$VAULT_DIR/wiki/monitoring/config.md') as f: text = f.read()
+text = re.sub(r'pubmed:\n\s*enabled: \w+', 'pubmed:\n    enabled: true', text)
+text = re.sub(r'arxiv:\n\s*enabled: \w+', 'arxiv:\n    enabled: true', text)
+text = re.sub(r'semantic_scholar:\n\s*enabled: \w+', 'semantic_scholar:\n    enabled: true', text)
+# Update PubMed email if provided
+text = re.sub(r'email: \".*?\"', 'email: \"USER_EMAIL\"', text)
+with open('$VAULT_DIR/wiki/monitoring/config.md', 'w') as f: f.write(text)
+\""
 ```
 
 Show summary:
@@ -131,11 +188,31 @@ bash command:"cd $VAULT_DIR && python3 scripts/search_semantic_scholar.py --auth
 
 Ask alert level: high (instant alert) / medium (daily briefing) / low (weekly)
 
-Append to the Tracked Researchers table in `$VAULT_DIR/wiki/monitoring/config.md`:
+On **re-run**, first check existing tracked researchers:
 ```bash
-bash command:"sed -i '' '/^\| \[Researcher 1\]/i\\
-| Actual Name | Institution | high | reason' $VAULT_DIR/wiki/monitoring/config.md"
+bash command:"grep '^\|' $VAULT_DIR/wiki/monitoring/config.md | grep -v '\[Researcher' | grep -v '^\| Name' | grep -v '^\|---'"
 ```
+Show the user what's currently tracked and ask: "Want to replace the list or add to it?"
+
+To write researchers, use python to replace the entire table body (works for both
+first-run and re-run — replaces placeholder rows or existing rows):
+```bash
+bash command:"python3 -c \"
+import re
+with open('$VAULT_DIR/wiki/monitoring/config.md') as f: text = f.read()
+# Replace tracked researchers table rows (between header and next section)
+# Keep the header row, replace everything until the next ### or ---
+new_rows = '| Name1 | Institution1 | high | reason1 |\n| Name2 | Institution2 | medium | reason2 |'
+text = re.sub(
+    r'(\| Name \| Institution \| Alert Level \| Notes \|\n\|---.*?\|\n).*?(\n\n)',
+    r'\g<1>' + new_rows + r'\n\g<2>',
+    text, flags=re.DOTALL
+)
+with open('$VAULT_DIR/wiki/monitoring/config.md', 'w') as f: f.write(text)
+\""
+```
+
+Same approach for tracked papers and topics tables.
 
 Then ask: "Any key papers to monitor for citations? Give titles or IDs. (or 'skip')"
 Then ask: "Any topics to watch? Give topic name + 2-3 keywords each. (or 'skip')"
@@ -166,7 +243,25 @@ Quiet hours: [window or 'none']
 
 ### Stage 5: Schedule Setup
 
-Present available automated jobs:
+First, check for existing rw- cron jobs (re-run case):
+```bash
+bash command:"openclaw cron list 2>/dev/null | grep 'rw-' || echo 'none'"
+```
+
+If existing jobs found, tell the user: "You have existing scheduled jobs. I'll remove them and set up fresh ones."
+Delete old rw- jobs:
+```bash
+bash command:"openclaw cron list --json 2>/dev/null | python3 -c \"
+import json, sys, subprocess
+jobs = json.load(sys.stdin)
+for j in jobs:
+    if j.get('name','').startswith('rw-'):
+        subprocess.run(['openclaw','cron','delete', j['id']], capture_output=True)
+        print(f'Removed: {j[\"name\"]}')
+\" 2>/dev/null || true"
+```
+
+Then present available automated jobs:
 ```
 I can set up these automated research jobs for you:
 
@@ -191,7 +286,8 @@ Which ones would you like? (recommended: start with Morning Briefing + Nightly B
 
 For each selected job, ask what time (or accept suggested).
 
-Register each cron job using the timezone from Stage 4:
+Register each cron job using the timezone from Stage 4.
+All job names use the `rw-` prefix so they can be identified on re-run:
 ```bash
 bash command:"openclaw cron add --name 'rw-morning-briefing' --cron '3 7 * * *' --tz 'USER_TZ' --message '/rw briefing' --timeout-seconds 600"
 bash command:"openclaw cron add --name 'rw-nightly-batch' --cron '7 21 * * *' --tz 'USER_TZ' --message '/rw batch 5' --timeout-seconds 600"
