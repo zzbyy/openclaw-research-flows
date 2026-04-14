@@ -233,12 +233,12 @@ chmod +x "$VAULT_DIR/scripts/"*.py 2>/dev/null || true
 info "Vault ready at $VAULT_DIR"
 
 # =============================================
-# Step 4: Install skill
+# Step 4: Install skill — global or agent-specific
 # =============================================
-step "Step 4/5 — Installing research-wiki skill..."
+step "Step 4/5 — Where should the research-wiki skill be installed?"
 echo ""
 
-# Read global workspace from openclaw.json
+# Read agent info from openclaw.json and agents directory
 GLOBAL_WORKSPACE=$(python3 -c "
 import json, os
 try:
@@ -249,47 +249,41 @@ except: pass
 " 2>/dev/null)
 GLOBAL_WORKSPACE="${GLOBAL_WORKSPACE:-$HOME/.openclaw/workspace}"
 
-# Discover existing agents that have their own workspace
-AGENT_OPTIONS=()
-AGENT_WORKSPACES=()
+# Find named agents
+AGENTS=()
 AGENTS_DIR="$HOME/.openclaw/agents"
 if [ -d "$AGENTS_DIR" ]; then
     for agent_dir in "$AGENTS_DIR"/*/; do
         agent_name="$(basename "$agent_dir")"
-        [ -z "$agent_name" ] || [ "$agent_name" = "*" ] && continue
-        # Check if this agent has a workspace with a skills dir
-        for ws_candidate in "$agent_dir/workspace" "$agent_dir"; do
-            if [ -d "$ws_candidate/skills" ]; then
-                AGENT_OPTIONS+=("$agent_name")
-                AGENT_WORKSPACES+=("$ws_candidate")
-                break
-            fi
-        done
+        if [ -n "$agent_name" ] && [ "$agent_name" != "*" ]; then
+            AGENTS+=("$agent_name")
+        fi
     done
 fi
 
-echo "  The skill teaches your OpenClaw bot to handle research commands"
-echo "  like \"briefing\", \"ingest\", \"monitor\", etc."
+echo "  You can install the skill for:"
 echo ""
 
-# Build choices
-CHOICES=("Global — available to all agents (recommended)")
-for i in "${!AGENT_OPTIONS[@]}"; do
-    CHOICES+=("Agent \"${AGENT_OPTIONS[$i]}\" only")
+INSTALL_OPTIONS=("All agents (global) — every agent can use research commands")
+for agent in "${AGENTS[@]}"; do
+    INSTALL_OPTIONS+=("Agent \"$agent\" only — only this agent gets research commands")
 done
 
-if [ ${#CHOICES[@]} -gt 1 ]; then
-    choose INSTALL_CHOICE "${CHOICES[@]}"
-else
-    # Only global option available
-    INSTALL_CHOICE=0
-fi
+choose INSTALL_CHOICE "${INSTALL_OPTIONS[@]}"
 
 if [ "$INSTALL_CHOICE" -eq 0 ]; then
+    # Global install
     SKILL_DEST="$GLOBAL_WORKSPACE/skills/research-wiki"
+    info "Installing globally to $SKILL_DEST"
 else
-    agent_idx=$((INSTALL_CHOICE - 1))
-    SKILL_DEST="${AGENT_WORKSPACES[$agent_idx]}/skills/research-wiki"
+    # Agent-specific install
+    AGENT_NAME="${AGENTS[$((INSTALL_CHOICE-1))]}"
+    # Agent skills go in the agent's workspace skills dir
+    # Check if agent has its own workspace, otherwise create skills under agents dir
+    AGENT_WORKSPACE="$AGENTS_DIR/$AGENT_NAME/skills"
+    mkdir -p "$AGENT_WORKSPACE"
+    SKILL_DEST="$AGENT_WORKSPACE/research-wiki"
+    info "Installing for agent \"$AGENT_NAME\" at $SKILL_DEST"
 fi
 
 mkdir -p "$SKILL_DEST/scripts"
@@ -297,14 +291,14 @@ cp "$SCRIPT_DIR/skill/SKILL.md" "$SKILL_DEST/SKILL.md"
 cp "$SCRIPT_DIR/skill/scripts/dispatch-research.sh" "$SKILL_DEST/scripts/dispatch-research.sh"
 chmod +x "$SKILL_DEST/scripts/dispatch-research.sh"
 
-# Wire vault path into dispatch script
+# Wire vault path
 if [[ "$OSTYPE" == "darwin"* ]]; then
     sed -i '' "s|__VAULT_DIR__|$VAULT_DIR|g" "$SKILL_DEST/scripts/dispatch-research.sh"
 else
     sed -i "s|__VAULT_DIR__|$VAULT_DIR|g" "$SKILL_DEST/scripts/dispatch-research.sh"
 fi
 
-info "Skill installed at $SKILL_DEST"
+info "Skill installed"
 
 # =============================================
 # Step 5: Python dependencies
