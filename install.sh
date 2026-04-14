@@ -233,72 +233,81 @@ chmod +x "$VAULT_DIR/scripts/"*.py 2>/dev/null || true
 info "Vault ready at $VAULT_DIR"
 
 # =============================================
-# Step 4: Install skill — global or agent-specific
+# Step 4: Install skill
 # =============================================
-step "Step 4/5 — Where should the research-wiki skill be installed?"
+step "Step 4/5 — Which agent should get the research-wiki skill?"
 echo ""
 
-# Read agent info from openclaw.json and agents directory
-GLOBAL_WORKSPACE=$(python3 -c "
-import json, os
+# Read agents from openclaw.json: defaults.workspace + list[]
+AGENT_INFO=$(python3 -c "
+import json, os, sys
 try:
     with open(os.path.expanduser('~/.openclaw/openclaw.json')) as f:
         cfg = json.load(f)
-    print(cfg.get('agents', {}).get('defaults', {}).get('workspace', ''))
-except: pass
+    agents = cfg.get('agents', {})
+    default_ws = agents.get('defaults', {}).get('workspace', os.path.expanduser('~/.openclaw/workspace'))
+    # Output: id|workspace per line. First line is always the global default.
+    print('__global__|' + default_ws)
+    for agent in agents.get('list', []):
+        aid = agent.get('id', '')
+        ws = agent.get('workspace', default_ws)
+        if aid:
+            print(aid + '|' + ws)
+except Exception as e:
+    print('__error__|' + str(e), file=sys.stderr)
+    sys.exit(1)
 " 2>/dev/null)
-GLOBAL_WORKSPACE="${GLOBAL_WORKSPACE:-$HOME/.openclaw/workspace}"
 
-# Find named agents
-AGENTS=()
-AGENTS_DIR="$HOME/.openclaw/agents"
-if [ -d "$AGENTS_DIR" ]; then
-    for agent_dir in "$AGENTS_DIR"/*/; do
-        agent_name="$(basename "$agent_dir")"
-        if [ -n "$agent_name" ] && [ "$agent_name" != "*" ]; then
-            AGENTS+=("$agent_name")
-        fi
-    done
+if [ -z "$AGENT_INFO" ]; then
+    # Fallback if python parsing fails
+    GLOBAL_WORKSPACE="$HOME/.openclaw/workspace"
+    AGENT_INFO="__global__|$GLOBAL_WORKSPACE"
+    warn "Could not read agents from openclaw.json, using default workspace"
 fi
 
-echo "  You can install the skill for:"
-echo ""
+# Parse into arrays
+AGENT_IDS=()
+AGENT_WORKSPACES=()
+while IFS='|' read -r aid aws; do
+    AGENT_IDS+=("$aid")
+    AGENT_WORKSPACES+=("$aws")
+done <<< "$AGENT_INFO"
 
-INSTALL_OPTIONS=("All agents (global) — every agent can use research commands")
-for agent in "${AGENTS[@]}"; do
-    INSTALL_OPTIONS+=("Agent \"$agent\" only — only this agent gets research commands")
+# Build choices
+CHOICES=()
+for i in "${!AGENT_IDS[@]}"; do
+    aid="${AGENT_IDS[$i]}"
+    aws="${AGENT_WORKSPACES[$i]}"
+    if [ "$aid" = "__global__" ]; then
+        CHOICES+=("All agents (global) — ${aws}/skills/")
+    else
+        CHOICES+=("Agent \"$aid\" — ${aws}/skills/")
+    fi
 done
 
-choose INSTALL_CHOICE "${INSTALL_OPTIONS[@]}"
+choose INSTALL_CHOICE "${CHOICES[@]}"
 
-if [ "$INSTALL_CHOICE" -eq 0 ]; then
-    # Global install
-    SKILL_DEST="$GLOBAL_WORKSPACE/skills/research-wiki"
-    info "Installing globally to $SKILL_DEST"
-else
-    # Agent-specific install
-    AGENT_NAME="${AGENTS[$((INSTALL_CHOICE-1))]}"
-    # Agent skills go in the agent's workspace skills dir
-    # Check if agent has its own workspace, otherwise create skills under agents dir
-    AGENT_WORKSPACE="$AGENTS_DIR/$AGENT_NAME/skills"
-    mkdir -p "$AGENT_WORKSPACE"
-    SKILL_DEST="$AGENT_WORKSPACE/research-wiki"
-    info "Installing for agent \"$AGENT_NAME\" at $SKILL_DEST"
-fi
+CHOSEN_WORKSPACE="${AGENT_WORKSPACES[$INSTALL_CHOICE]}"
+CHOSEN_AGENT="${AGENT_IDS[$INSTALL_CHOICE]}"
+SKILL_DEST="$CHOSEN_WORKSPACE/skills/research-wiki"
 
 mkdir -p "$SKILL_DEST/scripts"
 cp "$SCRIPT_DIR/skill/SKILL.md" "$SKILL_DEST/SKILL.md"
 cp "$SCRIPT_DIR/skill/scripts/dispatch-research.sh" "$SKILL_DEST/scripts/dispatch-research.sh"
 chmod +x "$SKILL_DEST/scripts/dispatch-research.sh"
 
-# Wire vault path
+# Wire vault path into dispatch script
 if [[ "$OSTYPE" == "darwin"* ]]; then
     sed -i '' "s|__VAULT_DIR__|$VAULT_DIR|g" "$SKILL_DEST/scripts/dispatch-research.sh"
 else
     sed -i "s|__VAULT_DIR__|$VAULT_DIR|g" "$SKILL_DEST/scripts/dispatch-research.sh"
 fi
 
-info "Skill installed"
+if [ "$CHOSEN_AGENT" = "__global__" ]; then
+    info "Skill installed globally at $SKILL_DEST"
+else
+    info "Skill installed for agent \"$CHOSEN_AGENT\" at $SKILL_DEST"
+fi
 
 # =============================================
 # Step 5: Python dependencies
