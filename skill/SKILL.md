@@ -29,9 +29,13 @@ When a message matches any research wiki pattern below:
 
 **You MUST run dispatch-research.sh. You MUST NOT do the research work yourself.**
 
-**Pass the matched command VERBATIM to the dispatch script.**
+**Pass the matched command to the dispatch script.**
 Do NOT interpret, rephrase, summarize, or act on any part of the command.
 The command is for Claude Code, not for you.
+
+**CRITICAL: Do NOT put a `/` prefix on the command sent to dispatch-research.sh.**
+Claude Code treats `/something` as a built-in skill invocation and will fail with
+"Unknown skill". Send plain text like `onboard` or `briefing`, not `/onboard`.
 
 **If the conversation metadata contains `topic_id`, you MUST pass it as `--topic`** so notifications go back to this topic.
 
@@ -57,72 +61,72 @@ Match the user's message and extract the corresponding command to dispatch.
 
 ### Setup & Onboarding (first-time)
 
-| User says | Command to dispatch |
-|-----------|-------------------|
-| `/rw setup` | `/onboard` |
-| `/research-wiki setup` | `/onboard` |
-| `/rw onboard` | `/onboard` |
+| User says | Prompt to dispatch (no `/` prefix!) |
+|-----------|-------------------------------------|
+| `/rw setup` | `onboard` |
+| `/research-wiki setup` | `onboard` |
+| `/rw onboard` | `onboard` |
 
 ### Daily Briefing
 
-| User says | Command to dispatch |
+| User says | Prompt to dispatch |
 |-----------|-------------------|
-| `/rw briefing` | `/briefing` |
-| `/rw briefing 3 days` | `/briefing --days 3` |
-| `/rw catch up` | `/briefing --days 3` |
+| `/rw briefing` | `briefing` |
+| `/rw briefing 3 days` | `briefing --days 3` |
+| `/rw catch up` | `briefing --days 3` |
 
 ### Paper Ingestion
 
-| User says | Command to dispatch |
+| User says | Prompt to dispatch |
 |-----------|-------------------|
-| `/rw ingest [path]` | `/ingest [path]` |
-| `/rw ingest` | `/ingest raw/inbox/` |
+| `/rw ingest [path]` | `ingest [path]` |
+| `/rw ingest` | `ingest raw/inbox/` |
 
 ### Batch Processing
 
-| User says | Command to dispatch |
+| User says | Prompt to dispatch |
 |-----------|-------------------|
-| `/rw batch [N]` | `/batch raw/papers [N]` |
-| `/rw process inbox` | `/batch raw/inbox --all` |
-| `/rw continue` | `/batch --continue 5` |
+| `/rw batch [N]` | `batch raw/papers [N]` |
+| `/rw process inbox` | `batch raw/inbox --all` |
+| `/rw continue` | `batch --continue 5` |
 
 ### Queries & Synthesis
 
-| User says | Command to dispatch |
+| User says | Prompt to dispatch |
 |-----------|-------------------|
-| `/rw query [X]` | `/query [X]` |
-| `/rw compare [X] and [Y]` | `/query Compare [X] and [Y]` |
-| `/rw synthesize [topic]` | `/synthesis [topic]` |
+| `/rw query [X]` | `query [X]` |
+| `/rw compare [X] and [Y]` | `query Compare [X] and [Y]` |
+| `/rw synthesize [topic]` | `synthesis [topic]` |
 
 ### Monitoring
 
-| User says | Command to dispatch |
+| User says | Prompt to dispatch |
 |-----------|-------------------|
-| `/rw monitor` | `/monitor run` |
-| `/rw monitor status` | `/monitor status` |
-| `/rw monitor quick` | `/monitor run --quick` |
-| `/rw track researcher [name]` | `/monitor add-researcher [name]` |
-| `/rw track paper [id]` | `/monitor add-paper [id]` |
-| `/rw track topic [name]` | `/monitor add-topic [name]` |
-| `/rw review [topic]` | `/monitor review [topic]` |
-| `/rw gaps` | `/monitor gaps` |
+| `/rw monitor` | `monitor run` |
+| `/rw monitor status` | `monitor status` |
+| `/rw monitor quick` | `monitor run --quick` |
+| `/rw track researcher [name]` | `monitor add-researcher [name]` |
+| `/rw track paper [id]` | `monitor add-paper [id]` |
+| `/rw track topic [name]` | `monitor add-topic [name]` |
+| `/rw review [topic]` | `monitor review [topic]` |
+| `/rw gaps` | `monitor gaps` |
 
 ### Wiki Maintenance
 
-| User says | Command to dispatch |
+| User says | Prompt to dispatch |
 |-----------|-------------------|
-| `/rw lint` | `/lint --fix` |
-| `/rw lint deep` | `/lint --fix --deep` |
-| `/rw stats` | `/stats` |
+| `/rw lint` | `lint --fix` |
+| `/rw lint deep` | `lint --fix --deep` |
+| `/rw stats` | `stats` |
 
 ### Triage & Review
 
-| User says | Command to dispatch |
+| User says | Prompt to dispatch |
 |-----------|-------------------|
-| `/rw triage` | `/triage` |
-| `/rw recent` | `/recent 10` |
-| `/rw questions` | `/questions` |
-| `/rw contradictions` | `/contradictions` |
+| `/rw triage` | `triage` |
+| `/rw recent` | `recent 10` |
+| `/rw questions` | `questions` |
+| `/rw contradictions` | `contradictions` |
 
 ### Schedule Management
 
@@ -154,21 +158,21 @@ If you run `claude` directly or try to do the work yourself, none of the trackin
 
 When this skill receives messages from OpenClaw cron jobs, the same routing applies:
 
-| Cron message | Command |
+| Cron message | Prompt to dispatch (no `/` prefix!) |
 |---|---|
-| `/rw briefing` | `/briefing` |
-| `/rw batch 5` | `/batch --continue 5` |
-| `/rw stats daily` | `/stats --daily-summary` |
-| `/rw monitor quick` | `/monitor run --quick` |
-| `/rw monitor` | `/monitor run --full` |
-| `/rw gaps` | `/monitor gaps` |
-| `/rw lint deep` | `/lint --fix --deep` |
-| `/rw synthesize weekly` | `/synthesis --weekly` |
-| `/rw review all` | `/monitor review --all` |
-| `/rw lint decay` | `/lint --decay-only` |
-| `/rw stats full` | `/stats --full-report` |
-| `/rw triage` | `/triage` |
-| `/rw process inbox` | `/batch raw/inbox --all` |
+| `/rw briefing` | `briefing` |
+| `/rw batch 5` | `batch --continue 5` |
+| `/rw stats daily` | `stats --daily-summary` |
+| `/rw monitor quick` | `monitor run --quick` |
+| `/rw monitor` | `monitor run --full` |
+| `/rw gaps` | `monitor gaps` |
+| `/rw lint deep` | `lint --fix --deep` |
+| `/rw synthesize weekly` | `synthesis --weekly` |
+| `/rw review all` | `monitor review --all` |
+| `/rw lint decay` | `lint --decay-only` |
+| `/rw stats full` | `stats --full-report` |
+| `/rw triage` | `triage` |
+| `/rw process inbox` | `batch raw/inbox --all` |
 
 ---
 

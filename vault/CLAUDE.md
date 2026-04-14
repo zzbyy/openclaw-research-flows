@@ -101,30 +101,35 @@ When a Claude Code session starts in this vault:
 
 ---
 
-## Slash Commands
+## Command Routing
 
-### Core Wiki Operations (workflow file required)
+When you receive a prompt, match it against the commands below.
+These are plain text commands (no `/` prefix) — dispatched by OpenClaw via cc-bridge.
+
+### Commands with workflow files
+
+When you see these commands, read the corresponding workflow file and follow it step by step.
 
 | Command | Description | Workflow |
 |---------|-------------|----------|
-| `/ingest [path]` | Process a single source into the wiki | `commands/ingest.md` |
-| `/batch [folder] [count]` | Batch-process multiple papers | `commands/batch.md` |
-| `/briefing` | Generate daily research briefing | `commands/briefing.md` |
-| `/monitor [subcommand]` | Literature monitoring & reviews | `commands/monitor.md` |
-| `/lint [--fix] [--deep]` | Wiki health check & maintenance | `commands/lint.md` |
-| `/onboard` | Interactive first-time setup wizard | `commands/onboard.md` |
+| `ingest [path]` | Process a single source into the wiki | `commands/ingest.md` |
+| `batch [folder] [count]` | Batch-process multiple papers | `commands/batch.md` |
+| `briefing` | Generate daily research briefing | `commands/briefing.md` |
+| `monitor [subcommand]` | Literature monitoring & reviews | `commands/monitor.md` |
+| `lint [--fix] [--deep]` | Wiki health check & maintenance | `commands/lint.md` |
+| `onboard` | Interactive first-time setup wizard | `commands/onboard.md` |
 
-### Quick Commands (no workflow file — execute inline)
+### Quick commands (execute inline, no workflow file)
 
 | Command | Action |
 |---------|--------|
-| `/query [question]` | Search wiki, synthesize answer (see below) |
-| `/synthesis [topic]` | Generate topic synthesis (see below) |
-| `/stats` | Report wiki health and progress (see below) |
-| `/triage` | Show papers awaiting review |
-| `/questions` | List open research questions |
-| `/contradictions` | Show unresolved contradictions |
-| `/recent [n]` | Show n most recent ingests |
+| `query [question]` | Search wiki, synthesize answer (see below) |
+| `synthesis [topic]` | Generate topic synthesis (see below) |
+| `stats` | Report wiki health and progress (see below) |
+| `triage` | Show papers awaiting review |
+| `questions` | List open research questions |
+| `contradictions` | Show unresolved contradictions |
+| `recent [n]` | Show n most recent ingests |
 
 ---
 
