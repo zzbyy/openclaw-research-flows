@@ -117,7 +117,6 @@ When you see these commands, read the corresponding workflow file and follow it 
 | `briefing` | Generate daily research briefing | `commands/briefing.md` |
 | `monitor [subcommand]` | Literature monitoring & reviews | `commands/monitor.md` |
 | `lint [--fix] [--deep]` | Wiki health check & maintenance | `commands/lint.md` |
-| `onboard` | Interactive first-time setup wizard | `commands/onboard.md` |
 
 ### Quick commands (execute inline, no workflow file)
 
