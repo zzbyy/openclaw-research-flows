@@ -37,7 +37,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full data flow.
 ### Step 1: Install
 
 ```bash
-git clone <this-repo>
+git clone https://github.com/zzbyy/openclaw-research-flows.git
 cd openclaw-research-flows
 bash install.sh
 ```
