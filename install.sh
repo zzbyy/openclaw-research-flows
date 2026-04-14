@@ -211,13 +211,10 @@ else
     done
 fi
 
-# Resolve to absolute
-if [ -d "$(dirname "$VAULT_DIR")" ]; then
-    VAULT_DIR="$(cd "$(dirname "$VAULT_DIR")" && pwd)/$(basename "$VAULT_DIR")"
-fi
-
-# Create vault
+# Resolve to absolute path with correct case (macOS is case-insensitive
+# so /users/zz works but we need /Users/zz in the stored path)
 mkdir -p "$VAULT_DIR"
+VAULT_DIR="$(cd "$VAULT_DIR" && pwd -P)"
 cp -R "$SCRIPT_DIR/vault/"* "$VAULT_DIR/" 2>/dev/null || true
 for f in "$SCRIPT_DIR/vault/".*; do
     [ -f "$f" ] && cp "$f" "$VAULT_DIR/" 2>/dev/null || true
