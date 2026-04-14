@@ -34,18 +34,18 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full data flow.
 
 ## Quick Start
 
-### Step 1: Install (one command, no questions)
+### Step 1: Install (one command)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zzbyy/openclaw-research-flows/main/install.sh | bash
 ```
 
-The script runs silently — no questions asked. It:
-- Checks prerequisites (git, python3, claude, OpenClaw)
-- Clones the repo to `~/openclaw-research-flows`
-- Creates a vault at `~/research-vault`
-- Auto-detects your OpenClaw workspace and installs the skill
-- Installs Python packages (arxiv, requests, biopython)
+The installer guides you through two quick choices:
+1. **Vault location** — use an existing vault or create a new one (default: `~/research-vault`)
+2. **Skill scope** — install globally (all agents) or for a specific OpenClaw agent only
+
+It reads your `~/.openclaw/openclaw.json` to detect agents and workspace paths automatically.
+Then it installs the skill, creates the vault structure, and sets up Python packages.
 
 ### Step 2: Send "setup" in chat
 
