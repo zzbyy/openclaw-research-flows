@@ -178,18 +178,37 @@ if [ ${#EXISTING_VAULTS[@]} -gt 0 ]; then
 
     if [ "$VAULT_CHOICE" -lt "${#EXISTING_VAULTS[@]}" ]; then
         VAULT_DIR="${EXISTING_VAULTS[$VAULT_CHOICE]}"
-        # Remove trailing slash
         VAULT_DIR="${VAULT_DIR%/}"
         info "Using existing vault: $VAULT_DIR"
     else
-        prompt VAULT_DIR "Path for new vault" "$HOME/research-vault"
-        VAULT_DIR="${VAULT_DIR/#\~/$HOME}"
+        # Ask for new vault path with validation loop
+        while true; do
+            prompt VAULT_DIR "Path for new vault" "$HOME/research-vault"
+            VAULT_DIR="${VAULT_DIR/#\~/$HOME}"
+            PARENT="$(dirname "$VAULT_DIR")"
+            if [ -d "$PARENT" ] || mkdir -p "$PARENT" 2>/dev/null; then
+                break
+            fi
+            warn "Cannot create directory at that path. Check for typos and try again."
+            echo "  (Parent directory $PARENT does not exist or is not writable.)"
+            echo ""
+        done
     fi
 else
     echo "  Where should the vault be created?"
     echo ""
-    prompt VAULT_DIR "Vault path" "$HOME/research-vault"
-    VAULT_DIR="${VAULT_DIR/#\~/$HOME}"
+    # Ask with validation loop
+    while true; do
+        prompt VAULT_DIR "Vault path" "$HOME/research-vault"
+        VAULT_DIR="${VAULT_DIR/#\~/$HOME}"
+        PARENT="$(dirname "$VAULT_DIR")"
+        if [ -d "$PARENT" ] || mkdir -p "$PARENT" 2>/dev/null; then
+            break
+        fi
+        warn "Cannot create directory at that path. Check for typos and try again."
+        echo "  (Parent directory $PARENT does not exist or is not writable.)"
+        echo ""
+    done
 fi
 
 # Resolve to absolute
