@@ -47,12 +47,12 @@ The installer guides you through two quick choices:
 It reads your `~/.openclaw/openclaw.json` to detect agents and workspace paths automatically.
 Then it installs the skill, creates the vault structure, and sets up Python packages.
 
-### Step 2: Send "setup" in chat
+### Step 2: Run onboarding
 
 Open your **Telegram DM** or **Feishu DM** with your OpenClaw bot and send:
 
 ```
-setup
+/rw setup
 ```
 
 This starts an interactive wizard that walks you through:
@@ -62,7 +62,7 @@ This starts an interactive wizard that walks you through:
 4. Notification preferences
 5. Automated schedule (morning briefings, nightly batch, etc.)
 
-No need to edit config files manually — the wizard handles everything.
+No config files to edit — the wizard handles everything.
 
 ### Step 3: You're done
 
@@ -70,25 +70,25 @@ Your first briefing will arrive at the time you chose. Drop PDFs into `raw/inbox
 
 ## Commands
 
-Send these via Telegram DM or Feishu to your OpenClaw bot:
+All commands use the `/rw` prefix (short for research-wiki):
 
 | Command | What it does |
 |---------|-------------|
-| `setup` | First-time configuration wizard |
-| `briefing` | Morning research briefing with auto-ingest |
-| `ingest [path]` | Process a single paper into the wiki |
-| `batch [N] papers` | Batch-process N papers |
-| `process inbox` | Process all papers in raw/inbox/ |
-| `query [topic]` | Search the wiki and synthesize an answer |
-| `synthesize [topic]` | Generate a topic synthesis |
-| `monitor` | Run full literature monitoring cycle |
-| `track researcher [name]` | Start tracking a researcher |
-| `review [topic]` | Generate a literature review |
-| `find gaps` | Analyze knowledge gaps |
-| `lint` | Wiki health check and auto-fix |
-| `stats` | Wiki statistics |
-| `triage` | Show papers awaiting review |
-| `set up schedule` | Configure or change automated jobs |
+| `/rw setup` | First-time configuration wizard |
+| `/rw briefing` | Morning research briefing with auto-ingest |
+| `/rw ingest [path]` | Process a single paper into the wiki |
+| `/rw batch [N]` | Batch-process N papers |
+| `/rw process inbox` | Process all papers in raw/inbox/ |
+| `/rw query [topic]` | Search the wiki and synthesize an answer |
+| `/rw synthesize [topic]` | Generate a topic synthesis |
+| `/rw monitor` | Run full literature monitoring cycle |
+| `/rw track researcher [name]` | Start tracking a researcher |
+| `/rw review [topic]` | Generate a literature review |
+| `/rw gaps` | Analyze knowledge gaps |
+| `/rw lint` | Wiki health check and auto-fix |
+| `/rw stats` | Wiki statistics |
+| `/rw triage` | Show papers awaiting review |
+| `/rw schedule` | Configure or change automated jobs |
 
 ## Project Structure
 
