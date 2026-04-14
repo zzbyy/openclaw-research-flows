@@ -34,23 +34,22 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full data flow.
 
 ## Quick Start
 
-### Step 1: Install (one command)
+### Step 1: Install (one command, no questions)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zzbyy/openclaw-research-flows/main/install.sh | bash
 ```
 
-That's it. The script will:
-- Clone the repo to `~/openclaw-research-flows`
-- Ask where to create your vault
-- Ask where your OpenClaw workspace is
-- Create the vault, install the skill, and set up Python dependencies
+The script runs silently — no questions asked. It:
+- Checks prerequisites (git, python3, claude, OpenClaw)
+- Clones the repo to `~/openclaw-research-flows`
+- Creates a vault at `~/research-vault`
+- Auto-detects your OpenClaw workspace and installs the skill
+- Installs Python packages (arxiv, requests, biopython)
 
-(Or if you prefer to clone manually: `git clone https://github.com/zzbyy/openclaw-research-flows.git && cd openclaw-research-flows && bash install.sh`)
+### Step 2: Send "setup" in chat
 
-### Step 2: Complete onboarding
-
-Open your **Telegram DM** (or Feishu DM) with your OpenClaw bot and send:
+Open your **Telegram DM** or **Feishu DM** with your OpenClaw bot and send:
 
 ```
 setup
